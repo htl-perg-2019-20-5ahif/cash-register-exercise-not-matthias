@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using CashRegister.API;
 using CashRegister.API.Model;
+using System.Net;
 
 namespace CashRegister.API.Controllers
 {
@@ -78,12 +79,42 @@ namespace CashRegister.API.Controllers
         // To protect from overposting attacks, please enable the specific properties you want to bind to, for
         // more details see https://aka.ms/RazorPagesCRUD.
         [HttpPost]
-        public async Task<ActionResult<Receipt>> PostReceipt(Receipt receipt)
+        public async Task<IActionResult> Post([FromBody]List<ReceiptLineDto> receiptLineDto)
         {
-            _context.Receipts.Add(receipt);
+            if (receiptLineDto == null || receiptLineDto.Count == 0)
+            {
+                return BadRequest("Missing receipt lines");
+            }
+
+            // Read product data from DB for incoming product IDs
+            var products = new Dictionary<int, Product>();
+            foreach (var rl in receiptLineDto)
+            {
+                products[rl.ProductId] = await _context.Products.FirstOrDefaultAsync(p => p.ID == rl.ProductId);
+                if (products[rl.ProductId] == null)
+                {
+                    return BadRequest($"Unknown product ID {rl.ProductId}");
+                }
+            }
+
+            // Build receipt from DTO
+            var newReceipt = new Receipt
+            {
+                ReceiptTimestamp = DateTime.UtcNow,
+                ReceiptLines = receiptLineDto.Select(rl => new ReceiptLine
+                {
+                    ID = 0,
+                    BoughtProduct = products[rl.ProductId],
+                    Amount = rl.Amount,
+                    TotalPrice = rl.Amount * products[rl.ProductId].UnitPrice
+                }).ToList()
+            };
+            newReceipt.TotalPrice = newReceipt.ReceiptLines.Sum(rl => rl.TotalPrice);
+
+            await _context.Receipts.AddAsync(newReceipt);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetReceipt", new { id = receipt.ID }, receipt);
+            return StatusCode((int)HttpStatusCode.Created, newReceipt);
         }
 
         // DELETE: api/Receipts/5
