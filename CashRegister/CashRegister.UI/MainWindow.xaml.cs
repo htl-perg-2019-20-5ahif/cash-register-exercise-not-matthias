@@ -20,9 +20,16 @@ namespace CashRegister.UI
     /// </summary>
     public partial class MainWindow : Window
     {
+        private readonly MainWindowViewModel ViewModel;
+
         public MainWindow()
         {
             InitializeComponent();
+
+            DataContext = ViewModel = new MainWindowViewModel();
+
+            // When loaded: Initialize the items list
+            Loaded += async (_, __) => await ViewModel.LoadProductsAsync();
         }
     }
 }

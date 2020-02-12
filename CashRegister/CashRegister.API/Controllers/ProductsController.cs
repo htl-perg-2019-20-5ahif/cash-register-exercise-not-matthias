@@ -24,7 +24,14 @@ namespace CashRegister.API.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Product>>> GetProducts([FromQuery] string nameFilter = null)
         {
-            return await _context.Products.Where(product => product.Name.Contains(nameFilter)).ToListAsync();
+            IQueryable<Product> products = _context.Products;
+
+            if (!string.IsNullOrEmpty(nameFilter))
+            {
+                products = products.Where(product => product.Name.Contains(nameFilter));
+            }
+
+            return await products.ToListAsync();
         }
 
         // GET: api/Products/5
